@@ -35,7 +35,6 @@ async def get_webpage_content_with_crawl4ai(url: str):
         print(f"[Crawl4AI] Crawl failed for {url}: {result.error_message}")
         return None
     
-
 def split_string_by_newline(input_string: str) -> list[str]:
     """
     Splits an input string into a list of strings based on newline characters ('\n').
@@ -86,23 +85,23 @@ async def check_prompt_capability(x: str, ollama_model: str = OLLAMA_MODEL) -> t
 
     # Define the system prompt with clear classification criteria and JSON output instruction
     system_prompt = """You are an AI assistant designed to classify text based on its relevance to AI prompt engineering and adversarial prompt strategies.
-Your response MUST be a JSON object with two keys: "usability_score" (an integer: 1, 2, or 3) and "reason" (a string explaining the classification).
+    Your response MUST be a JSON object with two keys: "usability_score" (an integer: 1, 2, or 3) and "reason" (a string explaining the classification).
 
-Here are the classification criteria:
-1.  **usability_score: 1 (Not Useful)**
-    * The text is irrelevant, nonsensical, or has no clear connection to AI prompts, prompt engineering, or adversarial prompt strategies. It's just random text.
-2.  **usability_score: 2 (Potentially Useful)**
-    * The text discusses general AI capabilities, prompt engineering concepts, or general AI interaction.
-    * It might also discuss *how to create* adversarial prompts or strategies, but it is NOT a direct example prompt itself.
-    * It's not a direct example prompt.
-3.  **usability_score: 3 (An Example Prompt Itself)**
-    * The text is a direct, runnable example of a prompt intended for an AI model. This often includes explicit roles (e.g., "System:", "User:"), specific instructions for an AI, or a clear structure that an AI would directly process as an instruction.
+    Here are the classification criteria:
+    1.  **usability_score: 1 (Not Useful)**
+        * The text is irrelevant, nonsensical, or has no clear connection to AI prompts, prompt engineering, or adversarial prompt strategies. It's just random text.
+    2.  **usability_score: 2 (Potentially Useful)**
+        * The text discusses general AI capabilities, prompt engineering concepts, or general AI interaction.
+        * It might also discuss *how to create* adversarial prompts or strategies, but it is NOT a direct example prompt itself.
+        * It's not a direct example prompt.
+    3.  **usability_score: 3 (An Example Prompt Itself)**
+        * The text is a direct, runnable example of a prompt intended for an AI model. This often includes explicit roles (e.g., "System:", "User:"), specific instructions for an AI, or a clear structure that an AI would directly process as an instruction.
 
-Example Output Format:
-{"usability_score": 1, "reason": "The text is irrelevant."}
-{"usability_score": 2, "reason": "The text discusses general prompt engineering concepts."}
-{"usability_score": 3, "reason": "The text is a direct example of a user prompt."}
-"""
+    Example Output Format:
+    {"usability_score": 1, "reason": "The text is irrelevant."}
+    {"usability_score": 2, "reason": "The text discusses general prompt engineering concepts."}
+    {"usability_score": 3, "reason": "The text is a direct example of a user prompt."}
+    """
 
     user_prompt = f"Classify the following text:\n\n{text_to_classify}"
 
@@ -135,12 +134,14 @@ Example Output Format:
 
         llm_output_str = response['message']['content']
         print(f"[Classifier] Raw LLM output: '{llm_output_str}'")
-
-        # Use regex to extract the leading integer (1, 2, or 3)
-        match = re.match(r'^\s*([123])(?:\s*[:\-—]?\s*.*)?$', llm_output_str)
+        
+        if (len(llm_output_str) > 20) :
+            score = int(llm_output_str[20])
+            match = True
+        else :
+            match = False
 
         if match:
-            score = int(match.group(1))
             print(f"[Classifier] Parsed score: {score}")
             return (x, score)
         else:
@@ -208,7 +209,7 @@ async def main():
     # Always check the website's robots.txt and terms of service before scraping.
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
-    target_url = "https://www.bbc.com/news/articles/crk2264nrn2o" #"https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"
+    target_url = "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/" # "https://www.bbc.com/news/articles/crk2264nrn2o"
 
     print(f"Starting web scraping and paragraph extraction for: {target_url}")
 
