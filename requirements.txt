@@ -1,4 +1,13 @@
-jupyter
-notebook
-crewai[tools]
-langchain
+# jupyter
+# notebook
+# crewai[tools]
+# langchain
+# elasticsearch
+
+# beautifulsoup4
+# requests
+
+# ollama
+
+# crawl4ai
+# asyncio
