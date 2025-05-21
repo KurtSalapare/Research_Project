@@ -5,7 +5,7 @@ import ollama
 
 # --- Configuration ---
 OLLAMA_MODEL = 'llama3.2:latest' # Or 'qwen:latest', 'qwen:14b', etc.
-MAX_LLM_INPUT_CHARS = 5000 # Max characters for LLM input to avoid context window issues
+MAX_LLM_INPUT_CHARS = 15000 # Max characters for LLM input to avoid context window issues
                              # Adjust based on your Qwen model's actual context window.
 
 # --- 1. Function to crawl the URL and get html content using crawl4ai (Remains the same) ---
@@ -34,150 +34,173 @@ async def get_webpage_content_with_crawl4ai(url: str):
     else:
         print(f"[Crawl4AI] Crawl failed for {url}: {result.error_message}")
         return None
-
-"""
---- 2. Function to process text with Ollama/Qwen (MODIFIED for plain string output) ---
-async def extract_paragraphs_with_qwen(text_content: str, model: str = OLLAMA_MODEL) -> list[str]:
-
-    """ """
-    Uses Ollama/Qwen to extract only coherent text paragraphs from the given content.
-    Instructs Qwen to return paragraphs separated by two newlines, then splits them.
-    """"""
     
-    if not text_content:
-        return []
+
+def split_string_by_newline(input_string: str) -> list[str]:
+    """
+    Splits an input string into a list of strings based on newline characters ('\n').
+
+    Args:
+        input_string: The string to be split.
+
+    Returns:
+        A list of strings, where each element is a segment of the original string
+        separated by a newline.
+    """
+    if not isinstance(input_string, str):
+        raise TypeError("Input must be a string.")
+
+    # The .split('\n') method will split the string wherever a newline character occurs.
+    # It will return a list of the resulting substrings.
+    # If the string is empty, it returns ['']
+    # If the string ends with a newline, it will result in an empty string at the end of the list.
+    return input_string.split('\n')
+
+async def check_prompt_capability(x: str, ollama_model: str = OLLAMA_MODEL) -> tuple[str, int]:
+    """
+    Classifies an input string `x` based on its relevance to AI prompt engineering
+    and adversarial prompt strategies using an Ollama AI model.
+
+    Args:
+        x: The input string to classify.
+        ollama_model: The name of the Ollama model to use for classification.
+
+    Returns:
+        A tuple (original_string, usability_score) where usability_score is:
+        1: Not a useful text (irrelevant, nonsensical).
+        2: Could potentially be useful (general discussion, strategy ideas).
+        3: An example prompt itself (direct instruction for an AI).
+        0: If classification fails due to an error or unexpected AI response.
+    """
+    if not isinstance(x, str):
+        print(f"Warning: Input 'x' is not a string. Returning (x, 0).")
+        return (x, 0)
 
     client = ollama.Client()
 
-    # Limit the input text length to fit within the LLM's context window
-    if len(text_content) > MAX_LLM_INPUT_CHARS:
-        print(f"[Qwen] Truncating content to {MAX_LLM_INPUT_CHARS} characters for LLM processing.")
-        text_content = text_content[:MAX_LLM_INPUT_CHARS]
+    # Truncate input if it's too long for the LLM's context window
+    text_to_classify = x
+    if len(text_to_classify) > MAX_LLM_INPUT_CHARS:
+        print(f"Warning: Input text truncated from {len(text_to_classify)} to {MAX_LLM_INPUT_CHARS} characters.")
+        text_to_classify = text_to_classify[:MAX_LLM_INPUT_CHARS]
 
-    # Adjusted Prompt: Asking for newline-separated paragraphs, no JSON format
-    prompt_messages = [
-        {'role': 'system', 'content': 'You are an expert web content extractor. Your task is to identify and extract only the main, coherent text paragraphs from the provided web page content. Exclude all non-paragraph elements such as headers, footers, navigation links, advertisements, image captions, code blocks, or short, disconnected phrases. Return the extracted paragraphs as a single string, with each paragraph separated by exactly two newline characters (`\n\n`). Do NOT include any introductory or concluding remarks, explanations, or additional text from yourself.'},
-        {'role': 'user', 'content': f"Extract all text paragraphs from the following web page content:\n\n{text_content}"}
-    ]
+    # Define the system prompt with clear classification criteria and JSON output instruction
+    system_prompt = """You are an AI assistant designed to classify text based on its relevance to AI prompt engineering and adversarial prompt strategies.
+Your response MUST be a JSON object with two keys: "usability_score" (an integer: 1, 2, or 3) and "reason" (a string explaining the classification).
 
-    print(f"[Qwen] Sending content to {model} for paragraph extraction (plain text response expected)...")
-    try:
-        # Removed format='json' from here
-        response = await asyncio.to_thread(
-            lambda: client.chat(model=model, messages=prompt_messages, options={'temperature': 0.1})
-        )
+Here are the classification criteria:
+1.  **usability_score: 1 (Not Useful)**
+    * The text is irrelevant, nonsensical, or has no clear connection to AI prompts, prompt engineering, or adversarial prompt strategies. It's just random text.
+2.  **usability_score: 2 (Potentially Useful)**
+    * The text discusses general AI capabilities, prompt engineering concepts, or general AI interaction.
+    * It might also discuss *how to create* adversarial prompts or strategies, but it is NOT a direct example prompt itself.
+    * It's not a direct example prompt.
+3.  **usability_score: 3 (An Example Prompt Itself)**
+    * The text is a direct, runnable example of a prompt intended for an AI model. This often includes explicit roles (e.g., "System:", "User:"), specific instructions for an AI, or a clear structure that an AI would directly process as an instruction.
 
-        qwen_output_str = response['message']['content']
-        print(f"[Qwen] Received raw response from {model}. Splitting into paragraphs.")
-
-        # Split the string by two newlines and strip whitespace from each part
-        # Filter out empty strings that might result from extra newlines or no content
-        paragraphs_list = [p.strip() for p in qwen_output_str.split('\n\n') if p.strip()]
-
-        return paragraphs_list
-
-    except ollama.ResponseError as e:
-        print(f"[Qwen] Error interacting with Ollama ({model}): {e}")
-        print("Please ensure Ollama is running and the model is pulled.")
-        return []
-    except Exception as e:
-        print(f"[Qwen] An unexpected error occurred during Ollama processing: {e}")
-        return []
+Example Output Format:
+{"usability_score": 1, "reason": "The text is irrelevant."}
+{"usability_score": 2, "reason": "The text discusses general prompt engineering concepts."}
+{"usability_score": 3, "reason": "The text is a direct example of a user prompt."}
 """
 
-# --- 2. Function to process text with Ollama/Qwen to extract paragraphs ---
-async def extract_paragraphs_with_qwen(text_content: str, model: str = OLLAMA_MODEL) -> list[str]:
-    """
-    Uses Ollama/Qwen to extract only coherent text paragraphs from the given content.
-    Instructs Qwen to return paragraphs separated by two newlines, then splits them.
-    This aims to get paragraphs "just like they would have been in a website".
-    """
-    if not text_content:
-        return []
+    user_prompt = f"Classify the following text:\n\n{text_to_classify}"
 
-    client = ollama.Client()
-    
-    
-    # Testing    
-    # splitted_results = split_string_into_chunks(text_content)
-    
-    # for i in splitted_results: 
-    #     print("\n")
-    #     print(i)
-    #     print("\n")
+    # Define the response schema to guide the LLM to produce valid JSON
+    response_schema = {
+        "type": "OBJECT",
+        "properties": {
+            "usability_score": { "type": "INTEGER" },
+            "reason": { "type": "STRING" }
+        },
+        "required": ["usability_score", "reason"]
+    }
 
-    # Prompt: Asking for newline-separated paragraphs, focusing on main, coherent text
-    # Modified Prompt for Qwen
-    # Modified Prompt for Qwen
-    # Modified Prompt for Qwen
-    
-    paragraphs_list = []
-    
-    prompt_messages = [
-        {'role': 'system', 'content': 'You are an AI assistant specialized in text organization and logical paragraph reconstruction. Your task is to take a raw stream of text, which may be unstructured, fragmented, or lack standard punctuation and spacing, and reformat it into coherent, standard paragraphs. Identify sentence boundaries and group related sentences into logical paragraphs.\n\nPresent the reformatted content as a series of distinct paragraphs. Each paragraph must be separated by exactly two newline characters (`\n\n`). Do not include any additional commentary, introductions, or conclusions from yourself. Focus solely on presenting the given text in a structured paragraph format.'},
-        {'role': 'user', 'content': f"Please reformat the following text into standard paragraphs:\n\n{text_content}"}
-    ]
-    
-    print(f"[Qwen] Sending content to {model} for paragraph extraction (plain text response expected)...")
+    print(f"\n[Classifier] Classifying text (first 100 chars): '{text_to_classify[:100]}...'")
     try:
-        # Using asyncio.to_thread for potentially blocking Ollama client calls
+        # Call Ollama model with the prompt and structured response format
         response = await asyncio.to_thread(
-            lambda: client.chat(model=model, messages=prompt_messages, options={'temperature': 0.1})
+            lambda: client.chat(
+                model=ollama_model,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_prompt}
+                ],
+                format='json', # Request JSON output
+                options={'temperature': 0.01}, # Low temperature for deterministic classification
+                # response_schema=response_schema # This might not be directly supported by all Ollama versions
+                                                # or clients, but 'format:json' usually helps.
+            )
         )
 
-        qwen_output_str = response['message']['content']
-        print(f"[Qwen] Received raw response from {model}. Splitting into paragraphs.")
+        llm_output_str = response['message']['content']
+        print(f"[Classifier] Raw LLM output: '{llm_output_str}'")
 
-        # Split the string by two newlines and strip whitespace from each part.
-        # Filter out empty strings that might result from extra newlines.
-        paragraphs_list.append(p.strip() for p in qwen_output_str.split('\n\n') if p.strip())
-        
-        # print("Paragraph List : ")
-        # print(paragraphs_list)
+        # Use regex to extract the leading integer (1, 2, or 3)
+        match = re.match(r'^\s*([123])(?:\s*[:\-—]?\s*.*)?$', llm_output_str)
 
-        return paragraphs_list
+        if match:
+            score = int(match.group(1))
+            print(f"[Classifier] Parsed score: {score}")
+            return (x, score)
+        else:
+            print(f"[Classifier] Could not parse a valid score (1, 2, or 3) from LLM output. Output: '{llm_output_str}'")
+            return (x, 0) # Indicate unclassifiable if parsing fails
 
     except ollama.ResponseError as e:
-        print(f"[Qwen] Error interacting with Ollama ({model}): {e}")
-        print("Please ensure Ollama is running and the model is pulled.")
-        return []
+        print(f"[Classifier] Ollama API error: {e}. Please ensure Ollama is running and model '{ollama_model}' is pulled.")
+        return (x, 0) # Indicate unclassifiable
     except Exception as e:
-        print(f"[Qwen] An unexpected error occurred during Ollama processing: {e}")
-        return []
-    
+        print(f"[Classifier] An unexpected error occurred during classification: {e}")
+        return (x, 0) # Indicate unclassifiable
 
-## Helper Splitting Function ##
-def split_string_into_chunks(
-    results_str: str,
-    max_chunk_size: int = 5000
-    ) -> list[str]:
+def categorize_results_by_usability(
+    results_list: list[tuple[str, int]]
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
+    """
+    Categorizes a list of (text, usability_score) tuples into three separate lists
+    based on their usability score.
 
-    if not isinstance(results_str, str):
-        raise TypeError("Input 'results_str' must be a string.")
-        
-    if not results_str:
-        return []
+    Args:
+        results_list: A list of tuples, where each tuple contains a string (text)
+                      and an integer (usability_score: 1, 2, or 3).
 
-    if max_chunk_size <= 0:
-        raise ValueError("max_chunk_size must be a positive integer.")
+    Returns:
+        A tuple containing three lists:
+        - List for score 1 (not useful)
+        - List for score 2 (potentially useful)
+        - List for score 3 (an example prompt itself)
+    """
+    # Initialize empty lists for each category
+    score_1_list = []  # For usability_score = 1 (not useful)
+    score_2_list = []  # For usability_score = 2 (potentially useful)
+    score_3_list = []  # For usability_score = 3 (an example prompt itself)
 
-    splitted_results = []
-    current_pos = 0
-    total_length = len(results_str)
+    # Iterate through the input results list
+    for item in results_list:
+        # Ensure the item is a tuple and has at least two elements
+        if not isinstance(item, tuple) or len(item) < 2:
+            print(f"Warning: Skipping malformed item: {item}. Expected (str, int) tuple.")
+            continue
 
-    while current_pos < total_length:
-        # Determine the end position for the current chunk
-        # It's either current_pos + max_chunk_size or the end of the string
-        end_pos = min(current_pos + max_chunk_size, total_length)
-        
-        # Extract the chunk
-        chunk = results_str[current_pos:end_pos]
-        splitted_results.append(chunk)
-        
-        # Move the starting position for the next chunk
-        current_pos = end_pos
+        text, score = item[0], int(item[1])
+        print(text)
+        print(score)
+        print(score == 1)
+        print(isinstance(score, int))
 
-    return splitted_results
+        # Categorize based on the usability score
+        if score == 1:
+            score_1_list.append((text, score))
+        elif score == 2:
+            score_2_list.append((text, score))
+        elif score == 3:
+            score_3_list.append((text, score))
+        else:
+            # Handle unexpected scores, e.g., print a warning or add to an 'other' list
+            print(f"Warning: Item '{text[:50]}...' has an unexpected usability score: {score}. Skipping categorization.")
+
+    return score_1_list, score_2_list, score_3_list
 
 # --- Main execution flow ---
 async def main():
@@ -185,7 +208,7 @@ async def main():
     # Always check the website's robots.txt and terms of service before scraping.
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
-    target_url = "https://www.crummy.com/software/BeautifulSoup/bs4/doc/" # "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"
+    target_url = "https://www.bbc.com/news/articles/crk2264nrn2o" #"https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"
 
     print(f"Starting web scraping and paragraph extraction for: {target_url}")
 
@@ -193,36 +216,27 @@ async def main():
     web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
     
     print(web_content_markdown)
+    splitted_web_content = split_string_by_newline(web_content_markdown)
+    print("Length : " + str(len(splitted_web_content)))
     
+    results = []
     
-    
-    
-    
- """   
-    if web_content_markdown:
-        # Step 2: Use Qwen to structure the Markdown content into clean paragraphs
-        print("\n" + "="*30 + "\n")
-        print("Passing Markdown content to Qwen for paragraph structuring...")
-        structured_paragraphs = await extract_paragraphs_with_qwen(web_content_markdown, model=OLLAMA_MODEL)
-        
-        structured_paragraphs = (list(structured_paragraphs[0]))
-        print("Length : " + str(len(structured_paragraphs)))
+    for x in splitted_web_content :
+        prompt, usability_score = await check_prompt_capability(x, OLLAMA_MODEL)
+        print(prompt)
+        print(usability_score)
+        results.append((prompt, usability_score))
+        print(results[results.index((prompt, usability_score))])
 
-        if structured_paragraphs:
-            print("\n--- Final Structured Paragraphs (from Qwen) ---")
-            print(f"Successfully extracted {len(structured_paragraphs)} main paragraphs:")
-            for i, paragraph in enumerate(structured_paragraphs):
-                print(f"--- Paragraph {i+1} ---")
-                print(paragraph)
-                print("-" * 20) # Simple separator
-            print("\n--- Process Completed ---")
-            return structured_paragraphs
-        else:
-            print("Qwen processing returned no structured paragraphs.")
-    else:
-        print("Failed to get web page content with crawl4ai.")
+    score1, score2, score3 = categorize_results_by_usability(results)
+    
+    print("Score 1 : ")
+    print(score1)
+    
+    print("\n + Score 2 : ")
+    print(score2)
 
-    return []
-"""
+    print("\n + Score 3 : ")
+    print(score3)
 
 asyncio.run(main())
