@@ -5,13 +5,14 @@ import ollama
 from crawler_prototype import *
 from prompt import *
 
+
 # --- Main execution flow ---
 async def main():
     # --- IMPORTANT: Replace with the actual URL you want to scrape ---
     # Always check the website's robots.txt and terms of service before scraping.
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
-    target_url = "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/" # "https://www.bbc.com/news/articles/crk2264nrn2o"
+    target_url = "https://www.cloudflare.com/learning/security/threats/owasp-top-10/" #"https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/" # "https://www.bbc.com/news/articles/crk2264nrn2o"
 
     print(f"Starting web scraping and paragraph extraction for: {target_url}")
 
@@ -26,20 +27,26 @@ async def main():
     
     for x in splitted_web_content :
         prompt, usability_score = await check_prompt_capability(x, OLLAMA_MODEL)
-        print(prompt)
-        print(usability_score)
+        # print(prompt)
+        # print(usability_score)
         results.append((prompt, usability_score))
-        print(results[results.index((prompt, usability_score))])
+        # print(results[results.index((prompt, usability_score))])
 
     score1, score2, score3 = categorize_results_by_usability(results)
     
     print("Score 1 : ")
-    print(score1)
+    for x in score1:
+        print(x)
     
     print("\n + Score 2 : ")
-    print(score2)
+    for x in score2:
+        print(x)
+        # adversarial_prompt = generate_prompt_from_content(x)
+        # print(adversarial_prompt)
+        # print("\n")
 
     print("\n + Score 3 : ")
-    print(score3)
+    for x in score3:
+        print(x)
 
 asyncio.run(main())
