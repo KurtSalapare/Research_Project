@@ -20,7 +20,7 @@ async def main():
     web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
     
     print(web_content_markdown)
-    splitted_web_content = split_string_by_newline(web_content_markdown)
+    splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
     print("Length : " + str(len(splitted_web_content)))
     
     results = []
@@ -41,9 +41,9 @@ async def main():
     print("\n + Score 2 : ")
     for x in score2:
         print(x)
-        # adversarial_prompt = generate_prompt_from_content(x)
-        # print(adversarial_prompt)
-        # print("\n")
+        adversarial_prompt = await generate_prompt_from_content(x)
+        print(adversarial_prompt)
+        print("\n")
 
     print("\n + Score 3 : ")
     for x in score3:
