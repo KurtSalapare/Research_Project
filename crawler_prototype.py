@@ -34,12 +34,8 @@ async def get_webpage_content_with_crawl4ai(url: str):
 
     print(f"[Crawl4AI] Starting crawl for: {url}")
     
-    print('RESULT UNDER')
-    print(" ")
     async with AsyncWebCrawler(config=browser_conf) as crawler:
         result = await crawler.arun(url=url, config=run_conf)
-        print(result)
-
     if result.success: # type: ignore
         print(f"[Crawl4AI] Successfully crawled {url}. Returning markdown content.")
         return result.markdown.fit_markdown # type: ignore #Changed from raw markdown to fit for cleaner fetching of only main text
@@ -78,15 +74,17 @@ async def test_crawler():
     # Step 1: Crawl the website to get its content
     web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
     
-    print(web_content_markdown)
     splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
+    
+    """ For Testing
     print("Length : " + str(len(splitted_web_content)))
     
     print("Testing Splitting : ")
     for split_text in splitted_web_content:
         print(split_text)
         print("\n")
- 
+    """
+  
 if __name__ == "__main__" :
     asyncio.run(test_crawler())
 
