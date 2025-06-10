@@ -19,9 +19,9 @@ async def main():
     # Step 1: Crawl the website to get its content
     web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
     
-    print(web_content_markdown)
+    # print(web_content_markdown) # For testing the crawling 
     splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
-    print("Length : " + str(len(splitted_web_content)))
+    # print("Length : " + str(len(splitted_web_content))) # For testing the amount of paragraphs
     
     results = []
     
@@ -32,6 +32,7 @@ async def main():
         results.append((prompt, usability_score))
         # print(results[results.index((prompt, usability_score))])
 
+    # """ Testing
     score1, score2, score3 = categorize_results_by_usability(results)
     
     print("Score 1 : ")
@@ -48,5 +49,9 @@ async def main():
     print("\n + Score 3 : ")
     for x in score3:
         print(x)
+        adversarial_prompt = await generate_prompt_from_content(x)
+        print(adversarial_prompt)
+        print("\n")
+    # """
 
 asyncio.run(main())
