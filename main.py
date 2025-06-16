@@ -7,9 +7,16 @@ import time
 from crawler_prototype import *
 from prompt import *
 
-# LLM Models
+from mapping import *
+
+# LLM Models 
 OLLAMA_MODEL = 'llama3.2:latest' # Or 'qwen:latest', 'qwen:14b', etc.
-PROMPT_CREATION_MODEL = 'mannix/llama3.1-8b-abliterated:latest' # Uncensored version to ensure no conflicts
+UNCENSORED_LLAMA_MODEL = 'mannix/llama3.1-8b-abliterated:latest' # Uncensored version to ensure no conflicts. Useful for prompt gen
+GEMMA_MODEL = 'gemma:7b'
+QWEN_MODEL = 'qwen:7b'
+DEEPSEEK_MODEL = 'deepseek-r1:7b'
+
+MODELS_LIST_ANALYSIS = [QWEN_MODEL, DEEPSEEK_MODEL, OLLAMA_MODEL]
 
 # Prompts for Text Analysis
 SYSTEM_PROMPT = """You are Qwen, created by Alibaba Cloud. You are a helpful assistant. You are designed to classify text based on its relevance to AI prompt engineering and adversarial prompt strategies.
@@ -92,6 +99,16 @@ USER_PROMPT_GEN = f"""
     ---
     Content to analyze:
     """
+    
+SYSTEM_PROMPT_GEN_2 = f"""
+"""
+USER_PROMPT_GEN_2 = f"""
+    """
+    
+SYSTEM_PROMPT_GEN_3 = f"""
+"""
+USER_PROMPT_GEN_3 = f"""
+    """
 PROMPT_GEN_TUPLE = (SYSTEM_PROMPT_GEN, USER_PROMPT_GEN)
 
 # --- Main execution flow ---
@@ -100,54 +117,45 @@ async def main():
     # Always check the website's robots.txt and terms of service before scraping.
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
-    target_url = "https://www.cloudflare.com/learning/security/threats/owasp-top-10/" #"https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/" # "https://www.bbc.com/news/articles/crk2264nrn2o"
+    target_url_list = ["https://www.cloudflare.com/learning/security/threats/owasp-top-10/",
+                  "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"] 
+                #   "https://www.bbc.com/news/articles/crk2264nrn2o"]
 
-    print(f"Starting web scraping and paragraph extraction for: {target_url}")
+    for target_url in target_url_list :
+        print(f"Starting web scraping and paragraph extraction for: {target_url}")
 
-    # Step 1: Crawl the website to get its content
-    web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
-    
-    # print(web_content_markdown) # For testing the crawling 
-    splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
-    # print("Length : " + str(len(splitted_web_content))) # For testing the amount of paragraphs
-    
-    results = []
-    
-    for x in splitted_web_content :
-        prompt, usability_score = await check_prompt_capability(x, OLLAMA_MODEL, (SYSTEM_PROMPT, USER_PROMPT))
-        # print(prompt)
-        # print(usability_score)
-        results.append((prompt, usability_score))
-        # print(results[results.index((prompt, usability_score))])
-
-    # Measure time to complete categorization
-    # start_time = time.perf_counter()
-    score1, score2, score3, paragraphs2, paragraphs3 = categorize_results_by_usability(results)
-    # end_time = time.perf_counter()
-    # time_to_complete = end_time - start_time
-    # print(f"Execution time (Paragraph Catergorization): {time_to_complete:.8f} seconds + \n")
-    
-    start_time = time.perf_counter()
-    print("Score 1 : ")
-    for x in score1:
-        print(x)
-    
-    print("\n + Score 2 : ")
-    for x in score2:
-        print(x)
-        adversarial_prompt = await generate_prompt_from_content(x[0], PROMPT_CREATION_MODEL, PROMPT_GEN_TUPLE)
-        print(adversarial_prompt)
-        print("\n")
-
-    print("\n + Score 3 : ")
-    for x in score3:
-        print(x)
-        adversarial_prompt = await generate_prompt_from_content(x[0], PROMPT_CREATION_MODEL, PROMPT_GEN_TUPLE)
-        print(adversarial_prompt)
-        print("\n")
-    
-    end_time = time.perf_counter()
-    time_to_complete = end_time - start_time
-    print(f"Execution time (Prompt Generation): {time_to_complete:.3f} seconds + \n")
+        # Step 1: Crawl the website to get its content
+        web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
+        
+        # print(web_content_markdown) # For testing the crawling 
+        splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
+        # print("Length : " + str(len(splitted_web_content))) # For testing the amount of paragraphs
+        
+        results = await analyze_content_with_ollama(splitted_web_content, MODELS_LIST_ANALYSIS, PROMPT_TUPLE_LIST)
+        
+        for model in MODELS_LIST_ANALYSIS:
+            print(f"Model : {model} : \n")
+        for prompt in PROMPT_TUPLE_LIST:
+            print(f"System Prompt : {[prompt[0]]} : \n")
+            result_1, result_2, result_3, paragraphs_2, paragraphs_3 = categorize_results_by_usability(results[model][prompt[0]]) # type: ignore
+            
+            print(paragraphs_2)
+            print("\n")
+            
+            generated_prompts_score_2 = await generate_propmts_from_list(paragraphs_2, [UNCENSORED_LLAMA_MODEL], [PROMPT_GEN_TUPLE])
+            for generated_prompt in generated_prompts_score_2[UNCENSORED_LLAMA_MODEL][PROMPT_GEN_TUPLE[0]]:
+                print(generated_prompt)
+            print("\n")
+            
+            print(paragraphs_3)
+            print("\n")
+            generated_prompts_score_3 = await generate_propmts_from_list(paragraphs_3, [UNCENSORED_LLAMA_MODEL], [PROMPT_GEN_TUPLE])
+            for generated_prompt in generated_prompts_score_3[UNCENSORED_LLAMA_MODEL][PROMPT_GEN_TUPLE[0]]:
+                print(generated_prompt)
+            print("\n")
+            
+            
+        
+        
 
 asyncio.run(main())
