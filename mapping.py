@@ -100,22 +100,22 @@ async def generate_propmts_from_list(
     # This will store the final results in the desired nested hashmap structure
     generated_prompts_list: dict[str, dict[str, list[str]]] = {} # Mapping to str which is the generated prompt
     
-    print("Starting analysis and preparing nested hashmap results...")
+    # print("Starting analysis and preparing nested hashmap results...")
 
     # Outer loop: Iterate through each model
     for model_llm_idx, model_name in enumerate(models):
-        print(f"\n--- Processing Model: {model_name} ({model_llm_idx+1}/{len(models)}) ---")
+        # print(f"\n--- Processing Model: {model_name} ({model_llm_idx+1}/{len(models)}) ---")
         generated_prompts_list[model_name] = {}
 
         # Middle loop: Iterate through each prompt
         for prompt_idx, prompt_text in enumerate(prompts):
-            print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
+            # print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
             # Initialize the list for the current prompt's results under this model
             generated_prompts_list[model_name][prompt_text[0]] = []
             
             # Inner loop: Iterate through each paragraph
             for para_idx, paragraph_content in enumerate(paragraphs):
-                print(f"    - Analyzing Paragraph ({para_idx+1}/{len(paragraphs)}) for '{paragraph_content[:50]}...'")
+                print(f"    - Generating Prompt from Paragraph ({para_idx+1}/{len(paragraphs)}) for '{paragraph_content[:50]}...'")
 
                 # Call the assumed analyze_text function
                 # This function is now expected to be defined elsewhere in your project
@@ -124,7 +124,7 @@ async def generate_propmts_from_list(
             
                 # Append the result for this paragraph to the list for the current model/prompt
                 
-                print(f"Result: {analysis_result[:70]}...") # Print a snippet of the result
+                # print(f"Result: {analysis_result[:70]}...") # Print a snippet of the result
 
     print("\nAnalysis complete! Results are ready in the returned nested dictionary.")
     return generated_prompts_list # type: ignore
@@ -169,6 +169,6 @@ async def test_analyze_content() :
     # print(results[OLLAMA_MODEL][PROMPT_TUPLE[0]])
     # print("\n")
     # print(paragraphs_2) # type: ignore
-    #testing for git
+    
 if __name__ == "__main__" :
     asyncio.run(test_analyze_content())
