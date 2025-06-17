@@ -89,16 +89,16 @@ async def analyze_content_with_ollama(
     return final_results_map # type: ignore
 
 async def generate_propmts_from_list(
-    paragraphs: list[str],
+    paragraphs: list[tuple[str, int]],
     models: list[str],
     prompts: list[tuple[str, str]] # is a list of tuples because it will have a system prompt (0) and a user prompt(1)
-) -> dict[str, dict[str, list[str]]]:
+) -> dict[str, dict[str, dict[int, list[str]]]]:
 
     if not (len(prompts) == 3 and len(models) == 3):
         print("Warning: The 'prompts' and 'models' lists ideally have 3 elements each, but the function will proceed with the provided lists.")
 
     # This will store the final results in the desired nested hashmap structure
-    generated_prompts_list: dict[str, dict[str, list[str]]] = {} # Mapping to str which is the generated prompt
+    generated_prompts_list: dict[str, dict[str, dict[int, list[str]]]] = {} # Mapping to str which is the generated prompt
     
     # print("Starting analysis and preparing nested hashmap results...")
 
@@ -111,7 +111,10 @@ async def generate_propmts_from_list(
         for prompt_idx, prompt_text in enumerate(prompts):
             # print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
             # Initialize the list for the current prompt's results under this model
-            generated_prompts_list[model_name][prompt_text[0]] = []
+            generated_prompts_list[model_name][prompt_text[0]] = {}
+            
+            usability_score = paragraphs[0][1]
+            generated_prompts_list[model_name][prompt_text[0]][usability_score] = []
             
             # Inner loop: Iterate through each paragraph
             for para_idx, paragraph_content in enumerate(paragraphs):
@@ -119,8 +122,8 @@ async def generate_propmts_from_list(
 
                 # Call the assumed analyze_text function
                 # This function is now expected to be defined elsewhere in your project
-                analysis_result = await generate_prompt_from_content(paragraph_content, model_name, prompt_text)
-                generated_prompts_list[model_name][prompt_text[0]].append(analysis_result)
+                analysis_result = await generate_prompt_from_content(paragraph_content[0], model_name, prompt_text)
+                generated_prompts_list[model_name][prompt_text[0]][usability_score].append(analysis_result)
             
                 # Append the result for this paragraph to the list for the current model/prompt
                 
@@ -155,11 +158,11 @@ async def test_analyze_content() :
             print(paragraphs_2)
             print("\n")
             
-            generated_prompts_score_2 = await generate_propmts_from_list(paragraphs_2, [LAMMA_UNCENSORED_MODEL], [PROMPT_GEN_TUPLE])
-
-            for generated_prompt in generated_prompts_score_2[LAMMA_UNCENSORED_MODEL][PROMPT_GEN_TUPLE[0]]:
-                print(generated_prompt)
-                print("\n")
+            generated_prompts_score_2 = await generate_propmts_from_list(result_2, [LAMMA_UNCENSORED_MODEL], [PROMPT_GEN_TUPLE])
+            print(generated_prompts_score_2)
+            # for generated_prompt in generated_prompts_score_2[LAMMA_UNCENSORED_MODEL][PROMPT_GEN_TUPLE[0]]:
+            #     print(generated_prompt)
+            #     print("\n")
             
             # for result in results[model][prompt[0]] :
             #     print(f"{result}\n")
