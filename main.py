@@ -2,7 +2,7 @@ import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 import ollama
 
-import time
+import json
 
 from crawler_prototype import *
 from prompt import *
@@ -16,7 +16,7 @@ GEMMA_MODEL = 'gemma:7b'
 QWEN_MODEL = 'qwen:7b'
 DEEPSEEK_MODEL = 'deepseek-r1:7b'
 
-MODELS_LIST_ANALYSIS = [QWEN_MODEL, DEEPSEEK_MODEL, OLLAMA_MODEL]
+MODELS_LIST_ANALYSIS = [OLLAMA_MODEL] #, QWEN_MODEL, GEMMA_MODEL]
 
 # Prompts for Text Analysis
 SYSTEM_PROMPT = """You are Qwen, created by Alibaba Cloud. You are a helpful assistant. You are designed to classify text based on its relevance to AI prompt engineering and adversarial prompt strategies.
@@ -82,7 +82,7 @@ Return ONLY valid JSON in the following format:
 
 """
 USER_PROMPT_GPT = F"Evaluate the following text and classify its usefulness for adversarial prompt engineering:\n\n"
-PROMPT_TUPLE_LIST = [(SYSTEM_PROMPT, USER_PROMPT), (SYSTEM_PROMPT_GEMMA, USER_PROMPT_GEMMA), (SYSTEM_PROMPT_GPT, USER_PROMPT_GPT)]
+PROMPT_TUPLE_LIST = [(SYSTEM_PROMPT, USER_PROMPT)] #, (SYSTEM_PROMPT_GEMMA, USER_PROMPT_GEMMA), (SYSTEM_PROMPT_GPT, USER_PROMPT_GPT)]
 
 # Prompts for Prompt Generation
 SYSTEM_PROMPT_GEN = f"""
@@ -117,8 +117,9 @@ async def main():
     # Always check the website's robots.txt and terms of service before scraping.
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
-    target_url_list = ["https://www.cloudflare.com/learning/security/threats/owasp-top-10/",
-                  "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"] 
+    target_url_list = ['https://www.nist.gov/news-events/news/2024/01/nist-identifies-types-cyberattacks-manipulate-behavior-ai-systems', 
+                       "https://www.cloudflare.com/learning/security/threats/owasp-top-10/",
+                       "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"] 
                 #   "https://www.bbc.com/news/articles/crk2264nrn2o"]
 
     for target_url in target_url_list :
@@ -133,6 +134,22 @@ async def main():
         
         results = await analyze_content_with_ollama(splitted_web_content, MODELS_LIST_ANALYSIS, PROMPT_TUPLE_LIST)
         
+        print(results)
+        
+        # Dumping all the hashmapped results of the paragraph classification into a json for easier manageability
+        try:
+            with open('repo/json_paragraph_classification.json', 'w', encoding='utf-8') as f:
+                print("Dumping JSON content to file...")
+                # Use json.dumps() on the 'results_hashmap' variable
+                f.write(json.dumps(results, indent=4))
+                print(f"Dumped !!! Results saved to 'repo/json_paragraph_classification.json'")
+        except IOError as e:
+            print(f"Error: Could not write JSON to file 'repo/json_paragraph_classification.json'. {e}")
+        except Exception as e:
+            print(f"Error: An unexpected error occurred during JSON dumping. {e}")
+            
+        prompts_results_dictionary: dict[str, dict[str, dict[int, list[str]]]] = {}
+        
         for model in MODELS_LIST_ANALYSIS:
             print(f"Model : {model} : \n")
         for prompt in PROMPT_TUPLE_LIST:
@@ -142,17 +159,44 @@ async def main():
             print(paragraphs_2)
             print("\n")
             
-            generated_prompts_score_2 = await generate_propmts_from_list(paragraphs_2, [UNCENSORED_LLAMA_MODEL], [PROMPT_GEN_TUPLE])
-            for generated_prompt in generated_prompts_score_2[UNCENSORED_LLAMA_MODEL][PROMPT_GEN_TUPLE[0]]:
-                print(generated_prompt)
-            print("\n")
+            generated_prompts_score_2 = await generate_propmts_from_list(result_2, [UNCENSORED_LLAMA_MODEL, QWEN_MODEL, GEMMA_MODEL], [PROMPT_GEN_TUPLE])
             
-            print(paragraphs_3)
-            print("\n")
-            generated_prompts_score_3 = await generate_propmts_from_list(paragraphs_3, [UNCENSORED_LLAMA_MODEL], [PROMPT_GEN_TUPLE])
-            for generated_prompt in generated_prompts_score_3[UNCENSORED_LLAMA_MODEL][PROMPT_GEN_TUPLE[0]]:
-                print(generated_prompt)
-            print("\n")
+            # Updates inner mapping of dictionary
+            for model_name, prompt_data_map in generated_prompts_score_2.items():
+                if model_name not in prompts_results_dictionary:
+                    prompts_results_dictionary[model_name] = {}
+                for prompt_text, score_data_map in prompt_data_map.items():
+                    if prompt_text not in prompts_results_dictionary[model_name]:
+                        prompts_results_dictionary[model_name][prompt_text] = {}
+                    # At this level, use update to merge the score dictionaries
+                    prompts_results_dictionary[model_name][prompt_text].update(score_data_map)
+
+            print(prompts_results_dictionary)
+            generated_prompts_score_3 = await generate_propmts_from_list(result_3, [UNCENSORED_LLAMA_MODEL, QWEN_MODEL, GEMMA_MODEL], [PROMPT_GEN_TUPLE])
+            
+            # Updates inner mapping of dictionary
+            for model_name, prompt_data_map in generated_prompts_score_3.items():
+                if model_name not in prompts_results_dictionary:
+                    prompts_results_dictionary[model_name] = {}
+                for prompt_text, score_data_map in prompt_data_map.items():
+                    if prompt_text not in prompts_results_dictionary[model_name]:
+                        prompts_results_dictionary[model_name][prompt_text] = {}
+                    # Update the inner-most dictionary to add/merge scores
+                    prompts_results_dictionary[model_name][prompt_text].update(score_data_map)
+            
+            print(prompts_results_dictionary)
+        
+        try:
+            with open('repo/json_prompt_generation.json', 'w', encoding='utf-8') as f:
+                print("Dumping JSON content to file...")
+                # Use json.dumps() on the 'results_hashmap' variable
+                f.write(json.dumps(prompts_results_dictionary, indent=4))
+                print(f"Dumped !!! Results saved to 'repo/json_prompt_generation.json'")
+        except IOError as e:
+            print(f"Error: Could not write JSON to file 'repo/json_prompt_generation.json'. {e}")
+        except Exception as e:
+            print(f"Error: An unexpected error occurred during JSON dumping. {e}")
+            
             
             
         
