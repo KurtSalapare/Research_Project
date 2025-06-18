@@ -102,35 +102,36 @@ async def generate_propmts_from_list(
     
     # print("Starting analysis and preparing nested hashmap results...")
 
-    # Outer loop: Iterate through each model
-    for model_llm_idx, model_name in enumerate(models):
-        # print(f"\n--- Processing Model: {model_name} ({model_llm_idx+1}/{len(models)}) ---")
-        generated_prompts_list[model_name] = {}
+    if paragraphs:
+        # Outer loop: Iterate through each model
+        for model_llm_idx, model_name in enumerate(models):
+            print(f"\n--- Processing Model: {model_name} ({model_llm_idx+1}/{len(models)}) ---")
+            generated_prompts_list[model_name] = {}
 
-        # Middle loop: Iterate through each prompt
-        for prompt_idx, prompt_text in enumerate(prompts):
-            # print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
-            # Initialize the list for the current prompt's results under this model
-            generated_prompts_list[model_name][prompt_text[0]] = {}
-            
-            usability_score = paragraphs[0][1]
-            generated_prompts_list[model_name][prompt_text[0]][usability_score] = []
-            
-            # Inner loop: Iterate through each paragraph
-            for para_idx, paragraph_content in enumerate(paragraphs):
-                print(f"    - Generating Prompt from Paragraph ({para_idx+1}/{len(paragraphs)}) for '{paragraph_content[:50]}...'")
-
-                # Call the assumed analyze_text function
-                # This function is now expected to be defined elsewhere in your project
-                analysis_result = await generate_prompt_from_content(paragraph_content[0], model_name, prompt_text)
-                generated_prompts_list[model_name][prompt_text[0]][usability_score].append(analysis_result)
-            
-                # Append the result for this paragraph to the list for the current model/prompt
+            # Middle loop: Iterate through each prompt
+            for prompt_idx, prompt_text in enumerate(prompts):
+                print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
+                # Initialize the list for the current prompt's results under this model
+                generated_prompts_list[model_name][prompt_text[0]] = {}
                 
-                # print(f"Result: {analysis_result[:70]}...") # Print a snippet of the result
+                usability_score = paragraphs[0][1]
+                generated_prompts_list[model_name][prompt_text[0]][usability_score] = []
+                
+                # Inner loop: Iterate through each paragraph
+                for para_idx, paragraph_content in enumerate(paragraphs):
+                    print(f"    - Generating Prompt from Paragraph ({para_idx+1}/{len(paragraphs)}) for '{paragraph_content[:50]}...'")
+
+                    # Call the assumed analyze_text function
+                    # This function is now expected to be defined elsewhere in your project
+                    analysis_result = await generate_prompt_from_content(paragraph_content[0], model_name, prompt_text)
+                    generated_prompts_list[model_name][prompt_text[0]][usability_score].append(analysis_result)
+                
+                    # Append the result for this paragraph to the list for the current model/prompt
+                    
+                    # print(f"Result: {analysis_result[:70]}...") # Print a snippet of the result
 
     print("\nAnalysis complete! Results are ready in the returned nested dictionary.")
-    return generated_prompts_list # type: ignore
+    return generated_prompts_list
 
 async def test_analyze_content() :
     target_url = "https://www.cloudflare.com/learning/security/threats/owasp-top-10/" #"https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/" # "https://www.bbc.com/news/articles/crk2264nrn2o"
