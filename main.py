@@ -16,7 +16,11 @@ GEMMA_MODEL = 'gemma:7b'
 QWEN_MODEL = 'qwen:7b'
 DEEPSEEK_MODEL = 'deepseek-r1:7b'
 
+# LLM Models for testing
+MISTRAL_MODEL = 'mistral:latest'
+
 MODELS_LIST_ANALYSIS = [OLLAMA_MODEL, GEMMA_MODEL, QWEN_MODEL]
+MODELS_LIST_PROMPT_GEN =[UNCENSORED_LLAMA_MODEL, GEMMA_MODEL, QWEN_MODEL]
 
 # Prompts for Text Analysis
 SYSTEM_PROMPT = """You are Qwen, created by Alibaba Cloud. You are a helpful assistant. You are designed to classify text based on its relevance to AI prompt engineering and adversarial prompt strategies.
@@ -82,7 +86,7 @@ Return ONLY valid JSON in the following format:
 
 """
 USER_PROMPT_GPT = F"Evaluate the following text and classify its usefulness for adversarial prompt engineering:\n\n"
-PROMPT_TUPLE_LIST = [(SYSTEM_PROMPT, USER_PROMPT), (SYSTEM_PROMPT_GEMMA, USER_PROMPT_GEMMA)]#, (SYSTEM_PROMPT_GPT, USER_PROMPT_GPT)]
+PROMPT_TUPLE_LIST = [(SYSTEM_PROMPT, USER_PROMPT), (SYSTEM_PROMPT_GEMMA, USER_PROMPT_GEMMA), (SYSTEM_PROMPT_GPT, USER_PROMPT_GPT)]
 
 # Prompts for Prompt Generation
 SYSTEM_PROMPT_GEN = f"""
@@ -118,8 +122,8 @@ async def main():
     # target_url = "https://www.theverge.com/2024/5/15/24157147/openai-gpt-4o-voice-mode-safety-concerns"
     # Example for a more structured site:
     target_url_list = ['https://www.nist.gov/news-events/news/2024/01/nist-identifies-types-cyberattacks-manipulate-behavior-ai-systems', 
-                       "https://www.cloudflare.com/learning/security/threats/owasp-top-10/"]
-                    #    "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"] 
+                       "https://www.cloudflare.com/learning/security/threats/owasp-top-10/",
+                       "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"] 
                 #   "https://www.bbc.com/news/articles/crk2264nrn2o"]
                 
     # [Website, [Model, [Prompt[(Paragraph, Score)]]]]
@@ -127,42 +131,40 @@ async def main():
     # [Website, [Model, [Prompt[Score, [Generated Prompts]]]]]
     prompts_results_dictionary: dict[str, dict[str, dict[str, dict[int, list[str]]]]] = {}
     
-    
-    
     for target_url in target_url_list :
         print(f"Starting web scraping and paragraph extraction for: {target_url}")
 
-        # # Step 1: Crawl the website to get its content
-        # web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
+        # Step 1: Crawl the website to get its content
+        web_content_markdown = await get_webpage_content_with_crawl4ai(target_url)
         
-        # # print(web_content_markdown) # For testing the crawling 
-        # splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
-        # # print("Length : " + str(len(splitted_web_content))) # For testing the amount of paragraphs
+        # print(web_content_markdown) # For testing the crawling 
+        splitted_web_content = split_string_by_newline(web_content_markdown) # type: ignore
+        # print("Length : " + str(len(splitted_web_content))) # For testing the amount of paragraphs
         
-        results = read_and_extract_model_prompt_data("repo/testJsonClassification.json", target_url) #await analyze_content_with_ollama(splitted_web_content, MODELS_LIST_ANALYSIS, PROMPT_TUPLE_LIST) #
+        results = await analyze_content_with_ollama(splitted_web_content, [MISTRAL_MODEL], PROMPT_TUPLE_LIST) # read_and_extract_model_prompt_data("repo/json_paragraph_classification.json", target_url) #
 
         # # print(results)
         
         # --- UPDATE SECTION TO MERGE 'results' INTO 'results_from_classification' ---
         # Initialize the top-level entry for the current target_url if it doesn't exist
-        # if target_url not in results_from_classification:
-        #     results_from_classification[target_url] = {}
+        if target_url not in results_from_classification:
+            results_from_classification[target_url] = {}
 
-        # # Iterate through the models returned by the analysis for the current URL
-        # for model_name, prompt_results_map in results.items():
-        #     # Initialize the model_name entry under the current target_url if it doesn't exist
-        #     if model_name not in results_from_classification[target_url]:
-        #         results_from_classification[target_url][model_name] = {}
+        # Iterate through the models returned by the analysis for the current URL
+        for model_name, prompt_results_map in results.items():
+            # Initialize the model_name entry under the current target_url if it doesn't exist
+            if model_name not in results_from_classification[target_url]:
+                results_from_classification[target_url][model_name] = {}
             
-        #     # Iterate through the prompts for the current model
-        #     for prompt_text, paragraph_results_list in prompt_results_map.items():
-        #         # Initialize the prompt_text entry under the current model if it doesn't exist
-        #         if prompt_text not in results_from_classification[target_url][model_name]:
-        #             results_from_classification[target_url][model_name][prompt_text] = []
+            # Iterate through the prompts for the current model
+            for prompt_text, paragraph_results_list in prompt_results_map.items():
+                # Initialize the prompt_text entry under the current model if it doesn't exist
+                if prompt_text not in results_from_classification[target_url][model_name]:
+                    results_from_classification[target_url][model_name][prompt_text] = []
                 
-        #         # Extend the list with the new (paragraph_result, score) tuples.
-        #         # This accumulates all paragraph analyses for this specific website-model-prompt.
-        #         results_from_classification[target_url][model_name][prompt_text].extend(paragraph_results_list)
+                # Extend the list with the new (paragraph_result, score) tuples.
+                # This accumulates all paragraph analyses for this specific website-model-prompt.
+                results_from_classification[target_url][model_name][prompt_text].extend(paragraph_results_list)
             
         # Paragraph Classification and Updating Hashmap Done. Now creating prompts. ##
         
@@ -172,9 +174,9 @@ async def main():
                 print(f"System Prompt : {[prompt[0]]} : \n")
                 result_1, result_2, result_3, paragraphs_2, paragraphs_3 = categorize_results_by_usability(results[model][prompt[0]]) # type: ignore
                 
-                generated_prompts_score_2 = await generate_propmts_from_list(result_2, [UNCENSORED_LLAMA_MODEL, OLLAMA_MODEL], [PROMPT_GEN_TUPLE])
+                generated_prompts_score_2 = await generate_propmts_from_list(result_2, [MISTRAL_MODEL], [PROMPT_GEN_TUPLE])
 
-                generated_prompts_score_3 = await generate_propmts_from_list(result_3, [UNCENSORED_LLAMA_MODEL, OLLAMA_MODEL], [PROMPT_GEN_TUPLE])
+                generated_prompts_score_3 = await generate_propmts_from_list(result_3, [MISTRAL_MODEL], [PROMPT_GEN_TUPLE])
                 
                 if target_url not in prompts_results_dictionary:
                     prompts_results_dictionary[target_url] = {}
@@ -195,6 +197,7 @@ async def main():
                                 prompts_results_dictionary[target_url][model_name][prompt_text][score] = []
                             # Always extend to add to the list associated with that score
                             prompts_results_dictionary[target_url][model_name][prompt_text][score].extend(prompts_generated_list)
+                            
                 # Iterate through the results from generated_prompts_score_3
                 for model_name, prompt_data_map in generated_prompts_score_3.items(): # Process score3 first
                     if model_name not in prompts_results_dictionary[target_url]:
@@ -214,7 +217,7 @@ async def main():
 
     # Dumping all the hashmapped results of the prompt generation into a json for easier manageability    
     try:
-        with open('repo/json_prompt_generation.json', 'w', encoding='utf-8') as f:
+        with open('repo/prompt_generation_checker.json', 'w', encoding='utf-8') as f:
             print("Dumping JSON content to file...")
             # Use json.dumps() on the 'results_hashmap' variable
             f.write(json.dumps(prompts_results_dictionary, indent=4))
@@ -225,76 +228,16 @@ async def main():
         print(f"Error: An unexpected error occurred during JSON dumping. {e}")
             
     # Dumping all the hashmapped results of the paragraph classification into a json for easier manageability
-    # try:
-    #     with open('repo/json_paragraph_classification.json', 'w', encoding='utf-8') as f:
-    #         print("Dumping JSON content to file...")
-    #         # Use json.dumps() on the 'results_hashmap' variable
-    #         f.write(json.dumps(results_from_classification, indent=4))
-    #         print(f"Dumped !!! Results saved to 'repo/json_paragraph_classification.json'")
-    # except IOError as e:
-    #     print(f"Error: Could not write JSON to file 'repo/json_paragraph_classification.json'. {e}")
-    # except Exception as e:
-    #     print(f"Error: An unexpected error occurred during JSON dumping. {e}")
-            
-def read_and_extract_model_prompt_data(
-    file_path: str,
-    target_website_url: str
-) -> dict[str, dict[str, list[tuple[str, int]]]] | None:
-    """
-    Reads a JSON file with the format {Website: {Model: {Prompt: [[Paragraph, Score]]}}}
-    and extracts the data for a specific website into the format {Model: {Prompt: [(Paragraph, Score)]}}.
-
-    Args:
-        file_path (str): The path to the JSON file.
-        target_website_url (str): The specific website URL (top-level key)
-                                  from which to extract the data.
-
-    Returns:
-        Dict[str, Dict[str, List[Tuple[str, int]]]] | None: A dictionary in the format
-        {Model: {Prompt: [(Paragraph, Score)]}} if the website data is found,
-        otherwise None.
-    """
-    
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            full_data = json.load(f)
-            
-            # Check if the target_website_url exists as a top-level key
-            if target_website_url in full_data:
-                # Extract the dictionary corresponding to the target_website_url
-                # The structure under this key is already: {Model: {Prompt: [[Paragraph, Score]]}}
-                extracted_data: dict[str, dict[str, list[tuple[str, int]]]] = {}
-
-                # The `full_data[target_website_url]` has the structure
-                # {Model (str): {Prompt (str): List[List[str, int]]}}
-                # We need to convert the inner List[List[str, int]] to List[Tuple[str, int]]
-                # json.load() might already convert inner lists to tuples if it can,
-                # but explicit conversion ensures consistency.
-
-                for model_name, prompt_data in full_data[target_website_url].items():
-                    extracted_data[model_name] = {}
-                    for prompt_text, paragraph_score_list_of_lists in prompt_data.items():
-                        # Convert each inner list [str, int] to a tuple (str, int)
-                        converted_list_of_tuples: list[tuple[str, int]] = []
-                        for item in paragraph_score_list_of_lists:
-                            if isinstance(item, list) and len(item) == 2 and \
-                               isinstance(item[0], str) and isinstance(item[1], int):
-                                converted_list_of_tuples.append(tuple(item))
-                            else:
-                                print(f"Warning: Unexpected item format for {model_name} -> {prompt_text}: {item}. Skipping or handling as error.")
-                        extracted_data[model_name][prompt_text] = converted_list_of_tuples
-                
-                return extracted_data
-            else:
-                print(f"Error: Target website URL '{target_website_url}' not found in the JSON file.")
-                return None
-            
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from '{file_path}'. Check if it's a valid JSON file.")
-        return None
+        with open('repo/paragraph_classification_checker.json', 'w', encoding='utf-8') as f:
+            print("Dumping JSON content to file...")
+            # Use json.dumps() on the 'results_hashmap' variable
+            f.write(json.dumps(results_from_classification, indent=4))
+            print(f"Dumped !!! Results saved to 'repo/json_paragraph_classification.json'")
+    except IOError as e:
+        print(f"Error: Could not write JSON to file 'repo/json_paragraph_classification.json'. {e}")
     except Exception as e:
-        print(f"An unexpected error occurred while reading the file: {e}")
-        return None        
+        print(f"Error: An unexpected error occurred during JSON dumping. {e}")
         
 
 asyncio.run(main())

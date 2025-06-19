@@ -173,6 +173,66 @@ async def test_analyze_content() :
     # print(results[OLLAMA_MODEL][PROMPT_TUPLE[0]])
     # print("\n")
     # print(paragraphs_2) # type: ignore
+
+def read_and_extract_model_prompt_data(
+    file_path: str,
+    target_website_url: str
+) -> dict[str, dict[str, list[tuple[str, int]]]] | None:
+    """
+    Reads a JSON file with the format {Website: {Model: {Prompt: [[Paragraph, Score]]}}}
+    and extracts the data for a specific website into the format {Model: {Prompt: [(Paragraph, Score)]}}.
+
+    Args:
+        file_path (str): The path to the JSON file.
+        target_website_url (str): The specific website URL (top-level key)
+                                  from which to extract the data.
+
+    Returns:
+        Dict[str, Dict[str, List[Tuple[str, int]]]] | None: A dictionary in the format
+        {Model: {Prompt: [(Paragraph, Score)]}} if the website data is found,
+        otherwise None.
+    """
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            full_data = json.load(f)
+            
+            # Check if the target_website_url exists as a top-level key
+            if target_website_url in full_data:
+                # Extract the dictionary corresponding to the target_website_url
+                # The structure under this key is already: {Model: {Prompt: [[Paragraph, Score]]}}
+                extracted_data: dict[str, dict[str, list[tuple[str, int]]]] = {}
+
+                # The `full_data[target_website_url]` has the structure
+                # {Model (str): {Prompt (str): List[List[str, int]]}}
+                # We need to convert the inner List[List[str, int]] to List[Tuple[str, int]]
+                # json.load() might already convert inner lists to tuples if it can,
+                # but explicit conversion ensures consistency.
+
+                for model_name, prompt_data in full_data[target_website_url].items():
+                    extracted_data[model_name] = {}
+                    for prompt_text, paragraph_score_list_of_lists in prompt_data.items():
+                        # Convert each inner list [str, int] to a tuple (str, int)
+                        converted_list_of_tuples: list[tuple[str, int]] = []
+                        for item in paragraph_score_list_of_lists:
+                            if isinstance(item, list) and len(item) == 2 and \
+                               isinstance(item[0], str) and isinstance(item[1], int):
+                                converted_list_of_tuples.append(tuple(item))
+                            else:
+                                print(f"Warning: Unexpected item format for {model_name} -> {prompt_text}: {item}. Skipping or handling as error.")
+                        extracted_data[model_name][prompt_text] = converted_list_of_tuples
+                
+                return extracted_data
+            else:
+                print(f"Error: Target website URL '{target_website_url}' not found in the JSON file.")
+                return None
+            
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON from '{file_path}'. Check if it's a valid JSON file.")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred while reading the file: {e}")
+        return None        
     
 if __name__ == "__main__" :
     asyncio.run(test_analyze_content())
