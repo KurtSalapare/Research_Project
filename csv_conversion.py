@@ -30,26 +30,30 @@ def create_dataframe_classified_paragraphs(data: dict) -> pd.DataFrame:
                 # paragraph_score_pairs_list is now expected to be a list of [paragraph, score] lists
                 if isinstance(paragraph_score_pairs_list, list):
                     for item in paragraph_score_pairs_list:
-                        # Each 'item' should be a list like [paragraph_string, score_int]
-                        if isinstance(item, list) and len(item) == 2:
+                        # Each 'item' should be a list like [paragraph_string, score_int, reason_string, computation_time_float]
+                        if isinstance(item, list) and len(item) == 4:
                             paragraph = item[0]
                             score = item[1]
+                            reason = item[2]
+                            computation_time = item[3]
 
-                            if isinstance(paragraph, str) and isinstance(score, int):
+                            if isinstance(paragraph, str) and isinstance(score, int) and isinstance(reason, str) and isinstance(computation_time, float):
                                 record = {
                                     "website_url": website_url,
                                     "llm_model": llm_model,
                                     "prompt": prompt_text,
                                     "paragraph": paragraph,
-                                    "score": score
+                                    "score": score,
+                                    "reason": reason,
+                                    "computation_time": computation_time
                                 }
                                 records.append(record)
                             else:
-                                print(f"Warning: Unexpected content in pair for prompt '{prompt_text}' "
+                                print(f"Warning: Unexpected content in tuple for prompt '{prompt_text}' "
                                       f"under model '{llm_model}' on '{website_url}': Expected [string, int], "
-                                      f"but got types: {type(paragraph)}, {type(score)}. Skipping inner record.")
+                                      f"but got types: {type(paragraph)}, {type(score)}, {type(reason)}, {type(computation_time)}. Skipping inner record.")
                         else:
-                            print(f"Warning: Expected inner list [paragraph, score] for prompt '{prompt_text}' "
+                            print(f"Warning: Expected inner list [paragraph, score, reason, computation time] for prompt '{prompt_text}' "
                                   f"under model '{llm_model}' on '{website_url}', but got type {type(item)}. Skipping item.")
                 else:
                     print(f"Warning: Expected a list of [paragraph, score] pairs for prompt '{prompt_text}' "
@@ -75,7 +79,7 @@ def create_dataframe_generated_prompts(data: dict) -> pd.DataFrame:
                 # score_to_generated_prompts_map is expected to be a dictionary where keys are scores (as strings)
                 # and values are lists of generated prompts (strings).
                 if isinstance(score_to_generated_prompts_map, dict):
-                    for score_str, generated_prompts_list in score_to_generated_prompts_map.items():
+                    for score_str, tuple_list in score_to_generated_prompts_map.items():
                         try:
                             score = int(score_str) # Convert score key to integer
                         except ValueError:
@@ -83,19 +87,30 @@ def create_dataframe_generated_prompts(data: dict) -> pd.DataFrame:
                                   f"under model '{llm_model}' on '{website_url}'. Skipping records for this score.")
                             continue # Skip this score if conversion fails
 
-                        if isinstance(generated_prompts_list, list) and all(isinstance(p, str) for p in generated_prompts_list):
+                        if isinstance(tuple_list, list) and all((len(t) == 3) for t in tuple_list):
                             # 'generated_prompts_list' is a list of strings
-                            for generated_prompt in generated_prompts_list:
-                                record = {
-                                    "website_url": website_url,
-                                    "llm_model": llm_model,
-                                    "prompt": prompt_text,
-                                    "score": score,
-                                    "generated_prompt": generated_prompt
-                                }
-                                records.append(record)
+                            for tuple in tuple_list:
+                                paragraph_analyzed = tuple[0]
+                                generated_prompt = tuple[1]
+                                computation_time = tuple[2]
+                                
+                                if isinstance(generated_prompt, str) and isinstance(computation_time, float):
+                                    record = {
+                                        "website_url": website_url,
+                                        "llm_model": llm_model,
+                                        "prompt": prompt_text,
+                                        "score": score,
+                                        "paragraph_analyzed": paragraph_analyzed,
+                                        "generated_prompt": generated_prompt,
+                                        "computation_time": computation_time
+                                    }
+                                    records.append(record)
+                                else:
+                                    print(f"Warning: Unexpected content in tuple for score '{score}' "
+                                      f"under score '{prompt_text}' for model '{llm_model}' on '{website_url}': Expected [string, float], "
+                                      f"but got types: {type(generated_prompt)}, {type(computation_time)}. Skipping inner record.")
                         else:
-                            print(f"Warning: Expected list of strings for generated prompts for score '{score_str}' "
+                            print(f"Warning: Expected list of tuples for score '{score_str}' "
                                   f"under prompt '{prompt_text}' for model '{llm_model}' on '{website_url}'. Skipping records.")
                 else:
                     print(f"Warning: Expected a dictionary of scores to generated prompts for prompt '{prompt_text}' "
@@ -107,7 +122,7 @@ def create_dataframe_generated_prompts(data: dict) -> pd.DataFrame:
 def main():
     # --- STEP 1: Define the filename for your JSON data ---
     # Make sure this file exists in the same directory as your script
-    json_input_filename = "repo/prompt_generation_checker.json" # Change this depending on which json file
+    json_input_filename = "repo/json_paragraph_classification.json" # Change this depending on which json file
 
     # --- STEP 2: Read the JSON file into a Python dictionary ---
     # Check if the file exists before attempting to read
@@ -122,7 +137,7 @@ def main():
 
     # --- STEP 3: Convert the dictionary data to a Pandas DataFrame ---
     print("Creating DataFrame from JSON data...")
-    dataframe = create_dataframe_generated_prompts(data=data)  # Change function to the appropriate dataframe creator
+    dataframe = create_dataframe_classified_paragraphs(data=data)  # Change function to the appropriate dataframe creator
     print("DataFrame created.")
 
     # --- STEP 4: (Optional) Display DataFrame info ---
@@ -136,7 +151,7 @@ def main():
         print("\nDataFrame is empty. No records were extracted, possibly due to warnings above or empty input.")
     
     # --- STEP 5: Convert DataFrame to CSV ---
-    output_csv_filename = "repo/mistral_prompt_generation.csv" # Change this for where you will save the csv
+    output_csv_filename = "repo/classified_paragraphs.csv" # Change this for where you will save the csv
     dataframe.to_csv(output_csv_filename, index=False)
     print(f"\nDataFrame successfully converted and saved to '{output_csv_filename}'.")
 
