@@ -118,7 +118,7 @@ async def check_prompt_capability(x: str, ollama_model: str, prompt: tuple[str, 
 
 def categorize_results_by_usability(
     results_list: list[tuple[str, int, str, float]]
-) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]], list[str], list [str]]:
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]]]:
     """
     Categorizes a list of (text, usability_score) tuples into three separate lists
     based on their usability score.
@@ -134,11 +134,8 @@ def categorize_results_by_usability(
         - List for score 3 (an example prompt itself)
     """
     # Initialize empty lists for each category
-    score_1_list = []  # For usability_score = 1 (not useful)
     score_2_list = []  # For usability_score = 2 (potentially useful)
     score_3_list = []  # For usability_score = 3 (an example prompt itself)
-    paragraphs_with_score_2 = []
-    paragraphs_with_score_3 = []
 
     # Iterate through the input results list
     for item in results_list:
@@ -150,19 +147,15 @@ def categorize_results_by_usability(
         text, score = item[0], int(item[1])
 
         # Categorize based on the usability score
-        if score == 1:
-            score_1_list.append((text, score))
-        elif score == 2:
+        if score == 2:
             score_2_list.append((text, score))
-            paragraphs_with_score_2.append(text)
         elif score == 3:
             score_3_list.append((text, score))
-            paragraphs_with_score_3.append(text)
         else:
             # Handle unexpected scores, e.g., print a warning or add to an 'other' list
             print(f"Warning: Item '{text[:50]}...' has an unexpected usability score: {score}. Skipping categorization.")
 
-    return score_1_list, score_2_list, score_3_list, paragraphs_with_score_2, paragraphs_with_score_3
+    return score_2_list, score_3_list
 
 
 async def generate_prompt_from_content(paragraph_content: str, ollama_model: str, prompt: tuple[str, str]) -> tuple[str, str, float]:

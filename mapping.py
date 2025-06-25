@@ -92,13 +92,13 @@ async def generate_propmts_from_list(
     paragraphs: list[tuple[str, int]],
     models: list[str],
     prompts: list[tuple[str, str]] # is a list of tuples because it will have a system prompt (0) and a user prompt(1)
-) -> dict[str, dict[str, dict[int, list[tuple[str, str, float]]]]]:
+) -> dict[str, dict[str, list[tuple[str, str, float]]]]:
 
     if not (len(prompts) == 3 and len(models) == 3):
         print("Warning: The 'prompts' and 'models' lists ideally have 3 elements each, but the function will proceed with the provided lists.")
 
     # This will store the final results in the desired nested hashmap structure
-    generated_prompts_list: dict[str, dict[str, dict[int, list[tuple[str, str, float]]]]] = {} # Mapping to str which is the generated prompt
+    generated_prompts_list: dict[str, dict[str, list[tuple[str, str, float]]]] = {} # Mapping to str which is the generated prompt
     
     # print("Starting analysis and preparing nested hashmap results...")
 
@@ -112,10 +112,7 @@ async def generate_propmts_from_list(
             for prompt_idx, prompt_text in enumerate(prompts):
                 print(f"  -- Processing Prompt ({prompt_idx+1}/{len(prompts)}) for '{prompt_text[:50]}...' --")
                 # Initialize the list for the current prompt's results under this model
-                generated_prompts_list[model_name][prompt_text[0]] = {}
-                
-                usability_score = paragraphs[0][1]
-                generated_prompts_list[model_name][prompt_text[0]][usability_score] = []
+                generated_prompts_list[model_name][prompt_text[0]] = []
                 
                 # Inner loop: Iterate through each paragraph
                 for para_idx, paragraph_content in enumerate(paragraphs):
@@ -124,7 +121,7 @@ async def generate_propmts_from_list(
                     # Call the assumed analyze_text function
                     # This function is now expected to be defined elsewhere in your project
                     analysis_result = await generate_prompt_from_content(paragraph_content[0], model_name, prompt_text)
-                    generated_prompts_list[model_name][prompt_text[0]][usability_score].append(analysis_result)
+                    generated_prompts_list[model_name][prompt_text[0]].append(analysis_result)
                 
                     # Append the result for this paragraph to the list for the current model/prompt
                     
@@ -177,7 +174,7 @@ async def test_analyze_content() :
 def read_and_extract_model_prompt_data(
     file_path: str,
     target_website_url: str
-) -> dict[str, dict[str, list[tuple[str, int]]]] | None:
+) -> dict[str, dict[str, list[tuple[str, int, str, float]]]] | None:
     """
     Reads a JSON file with the format {Website: {Model: {Prompt: [[Paragraph, Score]]}}}
     and extracts the data for a specific website into the format {Model: {Prompt: [(Paragraph, Score)]}}.
@@ -201,7 +198,7 @@ def read_and_extract_model_prompt_data(
             if target_website_url in full_data:
                 # Extract the dictionary corresponding to the target_website_url
                 # The structure under this key is already: {Model: {Prompt: [[Paragraph, Score]]}}
-                extracted_data: dict[str, dict[str, list[tuple[str, int]]]] = {}
+                extracted_data: dict[str, dict[str, list[tuple[str, int, str, float]]]] = {}
 
                 # The `full_data[target_website_url]` has the structure
                 # {Model (str): {Prompt (str): List[List[str, int]]}}
@@ -213,10 +210,10 @@ def read_and_extract_model_prompt_data(
                     extracted_data[model_name] = {}
                     for prompt_text, paragraph_score_list_of_lists in prompt_data.items():
                         # Convert each inner list [str, int] to a tuple (str, int)
-                        converted_list_of_tuples: list[tuple[str, int]] = []
+                        converted_list_of_tuples: list[tuple[str, int, str, float]] = []
                         for item in paragraph_score_list_of_lists:
-                            if isinstance(item, list) and len(item) == 2 and \
-                               isinstance(item[0], str) and isinstance(item[1], int):
+                            if isinstance(item, list) and len(item) == 4 and \
+                               isinstance(item[0], str) and isinstance(item[1], int) and isinstance(item[2], str) and isinstance(item[3], float):
                                 converted_list_of_tuples.append(tuple(item))
                             else:
                                 print(f"Warning: Unexpected item format for {model_name} -> {prompt_text}: {item}. Skipping or handling as error.")
